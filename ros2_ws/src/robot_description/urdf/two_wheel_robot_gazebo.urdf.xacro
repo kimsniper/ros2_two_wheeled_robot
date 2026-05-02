@@ -1,0 +1,86 @@
+<?xml version="1.0"?>
+
+<robot name="two_wheel_robot" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+    <gazebo reference="left_wheel">
+        <mu1>3.0</mu1>
+        <mu2>3.0</mu2>
+    </gazebo>
+
+    <gazebo reference="right_wheel">
+        <mu1>3.0</mu1>
+        <mu2>3.0</mu2>
+    </gazebo>
+
+    <gazebo reference="imu_link">
+
+        <sensor name="imu_sensor" type="imu">
+            
+            <always_on>true</always_on>
+            <update_rate>100</update_rate>
+            <visualize>true</visualize>
+            <topic>imu</topic>
+
+            <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu">
+                <noise>
+                    <type>gaussian</type>
+                    <rate>
+                        <mean>0.0</mean>
+                        <stddev>0.001</stddev>
+                    </rate>
+                    <accel>
+                        <mean>0.0</mean>
+                        <stddev>0.01</stddev>
+                    </accel>
+                </noise>
+            </plugin>
+
+            <imu>
+                <angular_velocity>
+                    <x>
+                        <noise type="gaussian">
+                            <mean>0.0</mean>
+                            <stddev>0.001</stddev>
+                        </noise>
+                    </x>
+                    <y>
+                        <noise type="gaussian">
+                            <mean>0.0</mean>
+                            <stddev>0.001</stddev>
+                        </noise>
+                    </y>
+                    <z>
+                        <noise type="gaussian">
+                            <mean>0.0</mean>
+                            <stddev>0.001</stddev>
+                        </noise>
+                    </z>
+                </angular_velocity>
+
+                <linear_acceleration>
+                    <x>
+                        <noise type="gaussian">
+                            <mean>0.0</mean>
+                            <stddev>0.01</stddev>
+                        </noise>
+                    </x>
+                    <y>
+                        <noise type="gaussian">
+                            <mean>0.0</mean>
+                            <stddev>0.01</stddev>
+                        </noise>
+                    </y>
+                    <z>
+                        <noise type="gaussian">
+                            <mean>0.0</mean>
+                            <stddev>0.01</stddev>
+                        </noise>
+                    </z>
+                </linear_acceleration>
+            </imu>
+
+        </sensor>
+
+    </gazebo>
+
+</robot>

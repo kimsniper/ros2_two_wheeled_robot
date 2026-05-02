@@ -1,0 +1,16 @@
+simulation:
+  ros__parameters:
+
+    use_sim_time: true
+
+    wheel_friction: 2.0
+    wheel_damping: 0.2
+
+    imu_noise_stddev: 0.01
+
+    update_rate: 200
+
+    gravity: 9.81
+
+    contact_stiffness: 10000.0
+    contact_damping: 50.0
