@@ -40,7 +40,7 @@ install(DIRECTORY include/
   DESTINATION include/
 )
 
-install(DIRECTORY config/
+install(DIRECTORY config
   DESTINATION share/${PROJECT_NAME}
 )
 
