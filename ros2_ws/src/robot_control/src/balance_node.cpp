@@ -40,7 +40,7 @@ class BalanceNode : public rclcpp::Node
 {
 public:
 
-    BalanceNode() : Node("balance_controller")
+    BalanceNode() : Node("balance_node")
     {
         pitch_sub_ = create_subscription<std_msgs::msg::Float64>("/state/pitch", 10, std::bind(&BalanceNode::pitchCallback, this, std::placeholders::_1));
 
@@ -50,9 +50,16 @@ public:
 
         controller_ = std::make_shared<BalanceController>();
 
-        double p = declare_parameter("kp", 30.0);
-        double i = declare_parameter("ki", 0.0);
-        double d = declare_parameter("kd", 1.2);
+        declare_parameter("kp", 30.0);
+        declare_parameter("ki", 0.0);
+        declare_parameter("kd", 1.2);
+
+        double p = get_parameter("kp").as_double();
+        double i = get_parameter("ki").as_double();
+        double d = get_parameter("kd").as_double();
+
+        RCLCPP_INFO(get_logger(), "PID updated: kp=%.3f ki=%.3f kd=%.3f", p, i, d);
+
         controller_->setGains(p, i, d);
 
         parameter_callback_handle_ = this->add_on_set_parameters_callback(
@@ -67,6 +74,7 @@ public:
                     if (param.get_name() == "ki") i_val = param.as_double();
                     if (param.get_name() == "kd") d_val = param.as_double();
                 }
+                RCLCPP_INFO(get_logger(), "PID updated: kp=%.3f ki=%.3f kd=%.3f", p_val, i_val, d_val);
                 controller_->setGains(p_val, i_val, d_val);
                 return result;
             });
