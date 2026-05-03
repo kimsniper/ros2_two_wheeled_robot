@@ -33,7 +33,7 @@
 
 ImuEKF::ImuEKF()
 {
-    x = {0,0,0,1, 0,0,0}; // quaternion + gyro bias
+    x = {0,0,0,1, 0,0,0};
 
     P.fill(0.0f);
     for (int i = 0; i < 7; i++)
@@ -55,9 +55,9 @@ std::array<float,4> ImuEKF::getQuaternion() const
 std::array<float,3> ImuEKF::gravityModel(const std::array<float,4>& q) const
 {
     return {
-        2.0f * (q[1]*q[3] - q[0]*q[2]),
-        2.0f * (q[0]*q[1] + q[2]*q[3]),
-        q[0]*q[0] - q[1]*q[1] - q[2]*q[2] + q[3]*q[3]
+        2.0f * (q[0]*q[2] - q[3]*q[1]),
+        2.0f * (q[3]*q[0] + q[1]*q[2]),
+        q[3]*q[3] - q[0]*q[0] - q[1]*q[1] + q[2]*q[2]
     };
 }
 
@@ -87,6 +87,17 @@ void ImuEKF::predict(const std::array<float,3>& gyro)
     x[1] = qy;
     x[2] = qz;
     x[3] = qw;
+
+    float F[49] = {0};
+    for(int i=0;i<7;i++) F[i*7+i]=1.0f;
+
+    std::array<float,49> Pnew = {0};
+    for(int i=0;i<7;i++)
+        for(int j=0;j<7;j++)
+            for(int k=0;k<7;k++)
+                Pnew[i*7+j]+=F[i*7+k]*P[k*7+j];
+
+    for(int i=0;i<49;i++) P[i]=Pnew[i];
 }
 
 void ImuEKF::update(const std::array<float,3>& accel)
@@ -95,27 +106,52 @@ void ImuEKF::update(const std::array<float,3>& accel)
     float ay = accel[1];
     float az = accel[2];
 
-    float norm = std::sqrt(ax*ax + ay*ay + az*az);
-    if (norm < 1e-6f) return;
+    float accel_mag = std::sqrt(ax*ax + ay*ay + az*az);
+    if (accel_mag < 1e-6f) return;
+    if (std::fabs(accel_mag - 9.81f) > 2.0f) return;
 
-    ax /= norm;
-    ay /= norm;
-    az /= norm;
+    ax /= accel_mag;
+    ay /= accel_mag;
+    az /= accel_mag;
 
     std::array<float,4> q = {x[0], x[1], x[2], x[3]};
     std::array<float,3> g = gravityModel(q);
 
-    float ex = (ay * g[2] - az * g[1]);
-    float ey = (az * g[0] - ax * g[2]);
-    float ez = (ax * g[1] - ay * g[0]);
+    float ex = ax - g[0];
+    float ey = ay - g[1];
+    float ez = az - g[2];
 
-    float k = 0.1f;
+    ex *= 0.05f;
+    ey *= 0.05f;
+    ez *= 0.05f;
+
+    if (ex > 0.5f) ex = 0.5f;
+    if (ex < -0.5f) ex = -0.5f;
+    if (ey > 0.5f) ey = 0.5f;
+    if (ey < -0.5f) ey = -0.5f;
+    if (ez > 0.5f) ez = 0.5f;
+    if (ez < -0.5f) ez = -0.5f;
+
+    float Sx = P[0] + 0.05f;
+    float Sy = P[8] + 0.05f;
+    float Sz = P[16] + 0.05f;
+
+    float Kx = P[0] / Sx;
+    float Ky = P[8] / Sy;
+    float Kz = P[16] / Sz;
+
+    x[0] += Kx * ex * dt;
+    x[1] += Ky * ey * dt;
+    x[2] += Kz * ez * dt;
+
+    float n = std::sqrt(x[0]*x[0]+x[1]*x[1]+x[2]*x[2]+x[3]*x[3]);
+    x[0]/=n; x[1]/=n; x[2]/=n; x[3]/=n;
 
     float bx = x[4], by = x[5], bz = x[6];
 
-    bx += k * ex * dt;
-    by += k * ey * dt;
-    bz += k * ez * dt;
+    bx += 0.0001f * ex * dt;
+    by += 0.0001f * ey * dt;
+    bz += 0.0001f * ez * dt;
 
     x[4] = bx;
     x[5] = by;

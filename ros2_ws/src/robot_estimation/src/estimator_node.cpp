@@ -34,6 +34,7 @@
 #include "std_msgs/msg/float64.hpp"
 
 #include "robot_estimation/imu_ekf.hpp"
+#include <cmath>
 
 class EstimatorNode : public rclcpp::Node
 {
@@ -50,6 +51,7 @@ public:
         pitch_rate_pub_ = create_publisher<std_msgs::msg::Float64>("/state/pitch_rate", 10);
 
         ekf_ = std::make_shared<ImuEKF>();
+        last_time_ = this->now();
 
         RCLCPP_INFO(get_logger(), "Robot Estimator Started");
     }
@@ -58,6 +60,15 @@ private:
 
     void imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg)
     {
+        rclcpp::Time current_time = msg->header.stamp;
+        double dt = (current_time - last_time_).seconds();
+        
+        if (dt <= 0.0 || dt > 0.1) {
+            dt = 0.01; // Default to 100Hz if clock is invalid
+        }
+        last_time_ = current_time;
+        ekf_->setDt(static_cast<float>(dt));
+
         std::array<float,3> gyro = {
             (float)msg->angular_velocity.x,
             (float)msg->angular_velocity.y,
@@ -83,12 +94,7 @@ private:
 
         quat_pub_->publish(out);
 
-        double pitch =
-            atan2(
-                2.0 * (out.w * out.y - out.z * out.x),
-                1.0 - 2.0 * (out.y * out.y + out.x * out.x)
-            );
-
+        double pitch = asin(std::max(-1.0, std::min(1.0, 2.0 * (out.w * out.y - out.z * out.x))));
         std_msgs::msg::Float64 p;
         p.data = pitch;
         pitch_pub_->publish(p);
@@ -104,6 +110,7 @@ private:
     rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr pitch_rate_pub_;
 
     std::shared_ptr<ImuEKF> ekf_;
+    rclcpp::Time last_time_;
 };
 
 int main(int argc, char ** argv)
