@@ -70,34 +70,58 @@ void ImuEKF::predict(const std::array<float,3>& gyro)
     float wy = gyro[1] - by;
     float wz = gyro[2] - bz;
 
-    float dq0 = 0.5f * (-qx*wx - qy*wy - qz*wz);
-    float dq1 = 0.5f * ( qw*wx + qy*wz - qz*wy);
-    float dq2 = 0.5f * ( qw*wy - qx*wz + qz*wx);
-    float dq3 = 0.5f * ( qw*wz + qx*wy - qy*wx);
+    float dw = 0.5f * (-qx*wx - qy*wy - qz*wz);
+    float dx = 0.5f * ( qw*wx + qy*wz - qz*wy);
+    float dy = 0.5f * ( qw*wy - qx*wz + qz*wx);
+    float dz = 0.5f * ( qw*wz + qx*wy - qy*wx);
 
-    qx += dq1 * dt;
-    qy += dq2 * dt;
-    qz += dq3 * dt;
-    qw += dq0 * dt;
+    qx += dx * dt;
+    qy += dy * dt;
+    qz += dz * dt;
+    qw += dw * dt;
 
     float norm = std::sqrt(qx*qx + qy*qy + qz*qz + qw*qw);
-    qx /= norm; qy /= norm; qz /= norm; qw /= norm;
+    qx /= norm;
+    qy /= norm;
+    qz /= norm;
+    qw /= norm;
 
     x[0] = qx;
     x[1] = qy;
     x[2] = qz;
     x[3] = qw;
 
-    float F[49] = {0};
-    for(int i=0;i<7;i++) F[i*7+i]=1.0f;
+    float F[49] = {
+        1,0,0,0,-0.5f*dt*qw, 0.5f*dt*qz,-0.5f*dt*qy,
+        0,1,0,0,-0.5f*dt*qz,-0.5f*dt*qw, 0.5f*dt*qx,
+        0,0,1,0, 0.5f*dt*qy,-0.5f*dt*qx,-0.5f*dt*qw,
+        0,0,0,1, 0.5f*dt*qx, 0.5f*dt*qy, 0.5f*dt*qz,
+        0,0,0,0,1,0,0,
+        0,0,0,0,0,1,0,
+        0,0,0,0,0,0,1
+    };
 
-    std::array<float,49> Pnew = {0};
+    float Q[49] = {0};
+
+    for(int i=0;i<7;i++)
+        Q[i*7+i]=0.0001f;
+
+    std::array<float,49> FP = {0};
+
     for(int i=0;i<7;i++)
         for(int j=0;j<7;j++)
             for(int k=0;k<7;k++)
-                Pnew[i*7+j]+=F[i*7+k]*P[k*7+j];
+                FP[i*7+j]+=F[i*7+k]*P[k*7+j];
 
-    for(int i=0;i<49;i++) P[i]=Pnew[i];
+    std::array<float,49> FPFt = {0};
+
+    for(int i=0;i<7;i++)
+        for(int j=0;j<7;j++)
+            for(int k=0;k<7;k++)
+                FPFt[i*7+j]+=FP[i*7+k]*F[j*7+k];
+
+    for(int i=0;i<49;i++)
+        P[i]=FPFt[i]+Q[i];
 }
 
 void ImuEKF::update(const std::array<float,3>& accel)
@@ -107,8 +131,12 @@ void ImuEKF::update(const std::array<float,3>& accel)
     float az = accel[2];
 
     float accel_mag = std::sqrt(ax*ax + ay*ay + az*az);
-    if (accel_mag < 1e-6f) return;
-    if (std::fabs(accel_mag - 9.81f) > 2.0f) return;
+
+    if (accel_mag < 1e-6f)
+        return;
+
+    if (std::fabs(accel_mag - 9.81f) > 2.0f)
+        return;
 
     ax /= accel_mag;
     ay /= accel_mag;
@@ -117,43 +145,110 @@ void ImuEKF::update(const std::array<float,3>& accel)
     std::array<float,4> q = {x[0], x[1], x[2], x[3]};
     std::array<float,3> g = gravityModel(q);
 
-    float ex = ax - g[0];
-    float ey = ay - g[1];
-    float ez = az - g[2];
+    float y[3] = {
+        ax - g[0],
+        ay - g[1],
+        az - g[2]
+    };
 
-    ex *= 0.05f;
-    ey *= 0.05f;
-    ez *= 0.05f;
+    float H[21] = {
+         2.0f*q[2],-2.0f*q[3], 2.0f*q[0],-2.0f*q[1],0,0,0,
+         2.0f*q[3], 2.0f*q[2], 2.0f*q[1], 2.0f*q[0],0,0,0,
+        -2.0f*q[0],-2.0f*q[1], 2.0f*q[2], 2.0f*q[3],0,0,0
+    };
 
-    if (ex > 0.5f) ex = 0.5f;
-    if (ex < -0.5f) ex = -0.5f;
-    if (ey > 0.5f) ey = 0.5f;
-    if (ey < -0.5f) ey = -0.5f;
-    if (ez > 0.5f) ez = 0.5f;
-    if (ez < -0.5f) ez = -0.5f;
+    float R[9] = {
+        0.05f,0,0,
+        0,0.05f,0,
+        0,0,0.05f
+    };
 
-    float Sx = P[0] + 0.05f;
-    float Sy = P[8] + 0.05f;
-    float Sz = P[16] + 0.05f;
+    float HP[21] = {0};
 
-    float Kx = P[0] / Sx;
-    float Ky = P[8] / Sy;
-    float Kz = P[16] / Sz;
+    for(int i=0;i<3;i++)
+        for(int j=0;j<7;j++)
+            for(int k=0;k<7;k++)
+                HP[i*7+j]+=H[i*7+k]*P[k*7+j];
 
-    x[0] += Kx * ex * dt;
-    x[1] += Ky * ey * dt;
-    x[2] += Kz * ez * dt;
+    float S[9] = {0};
+
+    for(int i=0;i<3;i++)
+        for(int j=0;j<3;j++)
+            for(int k=0;k<7;k++)
+                S[i*3+j]+=HP[i*7+k]*H[j*7+k];
+
+    for(int i=0;i<9;i++)
+        S[i]+=R[i];
+
+    float det =
+        S[0]*(S[4]*S[8]-S[5]*S[7])-
+        S[1]*(S[3]*S[8]-S[5]*S[6])+
+        S[2]*(S[3]*S[7]-S[4]*S[6]);
+
+    if(std::fabs(det)<1e-9f)
+        return;
+
+    float invS[9];
+
+    invS[0]=(S[4]*S[8]-S[5]*S[7])/det;
+    invS[1]=(S[2]*S[7]-S[1]*S[8])/det;
+    invS[2]=(S[1]*S[5]-S[2]*S[4])/det;
+
+    invS[3]=(S[5]*S[6]-S[3]*S[8])/det;
+    invS[4]=(S[0]*S[8]-S[2]*S[6])/det;
+    invS[5]=(S[2]*S[3]-S[0]*S[5])/det;
+
+    invS[6]=(S[3]*S[7]-S[4]*S[6])/det;
+    invS[7]=(S[1]*S[6]-S[0]*S[7])/det;
+    invS[8]=(S[0]*S[4]-S[1]*S[3])/det;
+
+    float PHt[21] = {0};
+
+    for(int i=0;i<7;i++)
+        for(int j=0;j<3;j++)
+            for(int k=0;k<7;k++)
+                PHt[i*3+j]+=P[i*7+k]*H[j*7+k];
+
+    float K[21] = {0};
+
+    for(int i=0;i<7;i++)
+        for(int j=0;j<3;j++)
+            for(int k=0;k<3;k++)
+                K[i*3+j]+=PHt[i*3+k]*invS[k*3+j];
+
+    for(int i=0;i<7;i++)
+        for(int j=0;j<3;j++)
+            x[i]+=K[i*3+j]*y[j];
 
     float n = std::sqrt(x[0]*x[0]+x[1]*x[1]+x[2]*x[2]+x[3]*x[3]);
-    x[0]/=n; x[1]/=n; x[2]/=n; x[3]/=n;
 
-    float bx = x[4], by = x[5], bz = x[6];
+    x[0]/=n;
+    x[1]/=n;
+    x[2]/=n;
+    x[3]/=n;
 
-    bx += 0.0001f * ex * dt;
-    by += 0.0001f * ey * dt;
-    bz += 0.0001f * ez * dt;
+    float KH[49] = {0};
 
-    x[4] = bx;
-    x[5] = by;
-    x[6] = bz;
+    for(int i=0;i<7;i++)
+        for(int j=0;j<7;j++)
+            for(int k=0;k<3;k++)
+                KH[i*7+j]+=K[i*3+k]*H[k*7+j];
+
+    float I_KH[49] = {0};
+
+    for(int i=0;i<7;i++)
+        I_KH[i*7+i]=1.0f;
+
+    for(int i=0;i<49;i++)
+        I_KH[i]-=KH[i];
+
+    std::array<float,49> Pnew = {0};
+
+    for(int i=0;i<7;i++)
+        for(int j=0;j<7;j++)
+            for(int k=0;k<7;k++)
+                Pnew[i*7+j]+=I_KH[i*7+k]*P[k*7+j];
+
+    for(int i=0;i<49;i++)
+        P[i]=Pnew[i];
 }
