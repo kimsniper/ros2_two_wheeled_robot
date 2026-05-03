@@ -50,7 +50,26 @@ public:
 
         controller_ = std::make_shared<BalanceController>();
 
-        controller_->setGains(declare_parameter("kp", 30.0), declare_parameter("ki", 0.0), declare_parameter("kd", 1.2));
+        double p = declare_parameter("kp", 30.0);
+        double i = declare_parameter("ki", 0.0);
+        double d = declare_parameter("kd", 1.2);
+        controller_->setGains(p, i, d);
+
+        parameter_callback_handle_ = this->add_on_set_parameters_callback(
+            [this](const std::vector<rclcpp::Parameter> &parameters) {
+                rcl_interfaces::msg::SetParametersResult result;
+                result.successful = true;
+                double p_val = get_parameter("kp").as_double();
+                double i_val = get_parameter("ki").as_double();
+                double d_val = get_parameter("kd").as_double();
+                for (const auto &param : parameters) {
+                    if (param.get_name() == "kp") p_val = param.as_double();
+                    if (param.get_name() == "ki") i_val = param.as_double();
+                    if (param.get_name() == "kd") d_val = param.as_double();
+                }
+                controller_->setGains(p_val, i_val, d_val);
+                return result;
+            });
 
         last_time_ = now();
 
@@ -97,7 +116,11 @@ private:
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr pitch_rate_sub_;
     rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr cmd_pub_;
 
+    std_msgs::msg::Float64MultiArray cmd;
+
     std::shared_ptr<BalanceController> controller_;
+
+    OnSetParametersCallbackHandle::SharedPtr parameter_callback_handle_;
 
     rclcpp::Time last_time_;
 
