@@ -28,6 +28,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+#include <algorithm>
 #include "robot_control/balance_controller.hpp"
 
 BalanceController::BalanceController()
@@ -52,6 +53,8 @@ float BalanceController::update(float pitch, float pitch_rate, float dt)
 
     integral += error * dt;
 
+    integral = std::max(-5.0f, std::min(5.0f, integral));
+
     float derivative = -pitch_rate;
 
     float output =
@@ -59,5 +62,5 @@ float BalanceController::update(float pitch, float pitch_rate, float dt)
         ki * integral +
         kd * derivative;
 
-    return output;
+    return -output;
 }

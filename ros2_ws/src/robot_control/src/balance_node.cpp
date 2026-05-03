@@ -46,13 +46,15 @@ public:
 
         pitch_rate_sub_ = create_subscription<std_msgs::msg::Float64>("/state/pitch_rate", 10, std::bind(&BalanceNode::pitchRateCallback, this, std::placeholders::_1));
 
-        cmd_pub_ = create_publisher<std_msgs::msg::Float64MultiArray>("/wheel_cmd", 10);
+        cmd_pub_ = create_publisher<std_msgs::msg::Float64MultiArray>("/wheel_controller/commands", 10);
 
         controller_ = std::make_shared<BalanceController>();
 
         controller_->setGains(declare_parameter("kp", 30.0), declare_parameter("ki", 0.0), declare_parameter("kd", 1.2));
 
         last_time_ = now();
+
+        timer_ = create_wall_timer(std::chrono::milliseconds(10), std::bind(&BalanceNode::updateLoop, this));
 
         RCLCPP_INFO(get_logger(), "Balance Controller Started");
     }
@@ -77,6 +79,12 @@ private:
 
         double control = controller_->update(pitch_, pitch_rate_, dt);
 
+        if (control > 10.0)
+            control = 10.0;
+
+        if (control < -10.0)
+            control = -10.0;
+
         std_msgs::msg::Float64MultiArray cmd;
         cmd.data.resize(2);
         cmd.data[0] = control;
@@ -92,6 +100,8 @@ private:
     std::shared_ptr<BalanceController> controller_;
 
     rclcpp::Time last_time_;
+
+    rclcpp::TimerBase::SharedPtr timer_;
 
     double pitch_ = 0.0;
     double pitch_rate_ = 0.0;
