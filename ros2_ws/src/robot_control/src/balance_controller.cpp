@@ -53,9 +53,11 @@ float BalanceController::update(float pitch, float pitch_rate, float dt)
 
     integral += error * dt;
 
-    integral = std::max(-5.0f, std::min(5.0f, integral));
+    integral = std::max(-1.0f, std::min(1.0f, integral));
 
-    float derivative = -pitch_rate;
+    static float filtered_pitch_rate = 0.0f;
+    filtered_pitch_rate = 0.8f * filtered_pitch_rate + 0.2f * (-pitch_rate);
+    float derivative = filtered_pitch_rate;
 
     float output =
         kp * error +

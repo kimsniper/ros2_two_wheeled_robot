@@ -90,7 +90,7 @@ public:
 
         last_time_ = now();
 
-        timer_ = create_wall_timer(std::chrono::milliseconds(10), std::bind(&BalanceNode::updateLoop, this));
+        timer_ = create_wall_timer(std::chrono::milliseconds(5), std::bind(&BalanceNode::updateLoop, this));
 
         RCLCPP_INFO(get_logger(), "Balance Controller Started");
     }
@@ -111,15 +111,17 @@ private:
     {
         auto now_time = now();
         double dt = (now_time - last_time_).seconds();
+        if (dt <= 0.0)
+            return;
         last_time_ = now_time;
 
         double control = controller_->update(pitch_, pitch_rate_, dt);
 
-        if (control > 10.0)
-            control = 10.0;
+        if (control > 15.0)
+            control = 15.0;
 
-        if (control < -10.0)
-            control = -10.0;
+        if (control < -15.0)
+            control = -15.0;
 
         std_msgs::msg::Float64MultiArray cmd;
         cmd.data.resize(2);
