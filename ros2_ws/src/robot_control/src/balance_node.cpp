@@ -48,6 +48,8 @@ public:
 
         cmd_pub_ = create_publisher<std_msgs::msg::Float64MultiArray>("/wheel_controller/commands", 10);
 
+        gain_sub_ = create_subscription<std_msgs::msg::Float64MultiArray>("/pid_gains", 10, std::bind(&BalanceNode::gainCallback, this, std::placeholders::_1));
+
         controller_ = std::make_shared<BalanceController>();
 
         declare_parameter("kp", 30.0);
@@ -117,11 +119,11 @@ private:
 
         double control = controller_->update(pitch_, pitch_rate_, dt);
 
-        if (control > 15.0)
-            control = 15.0;
+        if (control > 40.0)
+            control = 40.0;
 
-        if (control < -15.0)
-            control = -15.0;
+        if (control < -40.0)
+            control = -40.0;
 
         std_msgs::msg::Float64MultiArray cmd;
         cmd.data.resize(2);
@@ -131,9 +133,23 @@ private:
         cmd_pub_->publish(cmd);
     }
 
+    void gainCallback(const std_msgs::msg::Float64MultiArray::SharedPtr msg)
+    {
+        if (msg->data.size() < 3) return;
+
+        double kp = msg->data[0];
+        double ki = msg->data[1];
+        double kd = msg->data[2];
+
+        RCLCPP_INFO(get_logger(), "PID updated: kp=%.3f ki=%.3f kd=%.3f", kp, ki, kd);
+
+        controller_->setGains(kp, ki, kd);
+    }
+
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr pitch_sub_;
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr pitch_rate_sub_;
     rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr cmd_pub_;
+    rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr gain_sub_;
 
     std_msgs::msg::Float64MultiArray cmd;
 
