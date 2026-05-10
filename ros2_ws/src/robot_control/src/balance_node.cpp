@@ -76,6 +76,15 @@ public:
                 }
                 RCLCPP_INFO(get_logger(), "PID updated: kp=%.3f ki=%.3f kd=%.3f", p_val, i_val, d_val);
                 controller_->setGains(p_val, i_val, d_val);
+
+                std::string cmd = "ign service -s /world/empty/set_pose "
+                                    "--reqtype ignition.msgs.Pose "
+                                    "--reptype ignition.msgs.Boolean "
+                                    "--timeout 2000 "
+                                    "--req 'name: \"two_wheel_robot\" position { x: 0 y: 0 z: 0.3 }'";
+
+                std::system(cmd.c_str());
+
                 return result;
             });
 
