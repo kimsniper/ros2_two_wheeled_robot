@@ -42,6 +42,7 @@ public:
 private:
     void pitchCallback(const std_msgs::msg::Float64::SharedPtr msg);
     void rateCallback(const std_msgs::msg::Float64::SharedPtr msg);
+    void gainStateCallback(const std_msgs::msg::Float64MultiArray::SharedPtr msg);
     void step();
 
     double reward();
@@ -55,8 +56,11 @@ private:
 
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr pitch_sub_;
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr rate_sub_;
+    rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr gain_state_sub_;
     rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr gain_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
     double noise_scale_;
+
+    bool gains_initialized_;
 };

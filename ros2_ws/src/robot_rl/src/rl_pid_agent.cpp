@@ -39,15 +39,19 @@ RLPIDAgent::RLPIDAgent()
     pitch_ = 0.0;
     pitch_rate_ = 0.0;
 
-    kp_ = 500.0;
+    kp_ = 0.0;
     ki_ = 0.0;
-    kd_ = 120.0;
+    kd_ = 0.0;
+
+    gains_initialized_ = false;
 
     noise_scale_ = 0.2;
 
     pitch_sub_ = create_subscription<std_msgs::msg::Float64>("/state/pitch", 10, std::bind(&RLPIDAgent::pitchCallback, this, std::placeholders::_1));
 
     rate_sub_ = create_subscription<std_msgs::msg::Float64>("/state/pitch_rate", 10, std::bind(&RLPIDAgent::rateCallback, this, std::placeholders::_1));
+
+    gain_state_sub_ = create_subscription<std_msgs::msg::Float64MultiArray>("/current_pid_gains", 10, std::bind(&RLPIDAgent::gainStateCallback, this, std::placeholders::_1));
 
     gain_pub_ = create_publisher<std_msgs::msg::Float64MultiArray>("/pid_gains", 10);
 
@@ -66,6 +70,22 @@ void RLPIDAgent::rateCallback(const std_msgs::msg::Float64::SharedPtr msg)
     pitch_rate_ = msg->data;
 }
 
+void RLPIDAgent::gainStateCallback(const std_msgs::msg::Float64MultiArray::SharedPtr msg)
+{
+    if (msg->data.size() < 3) return;
+
+    if (!gains_initialized_)
+    {
+        kp_ = msg->data[0];
+        ki_ = msg->data[1];
+        kd_ = msg->data[2];
+
+        gains_initialized_ = true;
+
+        RCLCPP_INFO(get_logger(), "Initial PID received: kp=%.3f ki=%.3f kd=%.3f", kp_, ki_, kd_);
+    }
+}
+
 double RLPIDAgent::reward()
 {
     return - (std::abs(pitch_) + 0.1 * std::abs(pitch_rate_));
@@ -73,6 +93,9 @@ double RLPIDAgent::reward()
 
 void RLPIDAgent::step()
 {
+    if (!gains_initialized_)
+        return;
+
     double r = reward();
 
     static std::default_random_engine gen;

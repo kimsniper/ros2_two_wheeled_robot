@@ -48,6 +48,8 @@ public:
 
         cmd_pub_ = create_publisher<std_msgs::msg::Float64MultiArray>("/wheel_controller/commands", 10);
 
+        gain_pub_ = create_publisher<std_msgs::msg::Float64MultiArray>("/current_pid_gains", 10);
+
         gain_sub_ = create_subscription<std_msgs::msg::Float64MultiArray>("/pid_gains", 10, std::bind(&BalanceNode::gainCallback, this, std::placeholders::_1));
 
         controller_ = std::make_shared<BalanceController>();
@@ -59,6 +61,10 @@ public:
         double p = get_parameter("kp").as_double();
         double i = get_parameter("ki").as_double();
         double d = get_parameter("kd").as_double();
+
+        current_kp_ = p;
+        current_ki_ = i;
+        current_kd_ = d;
 
         RCLCPP_INFO(get_logger(), "PID updated: kp=%.3f ki=%.3f kd=%.3f", p, i, d);
 
@@ -76,8 +82,17 @@ public:
                     if (param.get_name() == "ki") i_val = param.as_double();
                     if (param.get_name() == "kd") d_val = param.as_double();
                 }
+
+                current_kp_ = p_val;
+                current_ki_ = i_val;
+                current_kd_ = d_val;
+
                 RCLCPP_INFO(get_logger(), "PID updated: kp=%.3f ki=%.3f kd=%.3f", p_val, i_val, d_val);
                 controller_->setGains(p_val, i_val, d_val);
+
+                std_msgs::msg::Float64MultiArray gain_msg;
+                gain_msg.data = {current_kp_, current_ki_, current_kd_};
+                gain_pub_->publish(gain_msg);
 
                 std::string cmd = "ign service -s /world/empty/set_pose "
                                     "--reqtype ignition.msgs.Pose "
@@ -131,6 +146,10 @@ private:
         cmd.data[1] = control;
 
         cmd_pub_->publish(cmd);
+
+        std_msgs::msg::Float64MultiArray gain_msg;
+        gain_msg.data = {current_kp_, current_ki_, current_kd_};
+        gain_pub_->publish(gain_msg);
     }
 
     void gainCallback(const std_msgs::msg::Float64MultiArray::SharedPtr msg)
@@ -141,6 +160,10 @@ private:
         double ki = msg->data[1];
         double kd = msg->data[2];
 
+        current_kp_ = kp;
+        current_ki_ = ki;
+        current_kd_ = kd;
+
         RCLCPP_INFO(get_logger(), "PID updated: kp=%.3f ki=%.3f kd=%.3f", kp, ki, kd);
 
         controller_->setGains(kp, ki, kd);
@@ -149,6 +172,7 @@ private:
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr pitch_sub_;
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr pitch_rate_sub_;
     rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr cmd_pub_;
+    rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr gain_pub_;
     rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr gain_sub_;
 
     std_msgs::msg::Float64MultiArray cmd;
@@ -163,6 +187,10 @@ private:
 
     double pitch_ = 0.0;
     double pitch_rate_ = 0.0;
+
+    double current_kp_ = 0.0;
+    double current_ki_ = 0.0;
+    double current_kd_ = 0.0;
 };
 
 int main(int argc, char ** argv)
