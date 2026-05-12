@@ -41,6 +41,8 @@ public:
 
         timer_ = create_wall_timer(std::chrono::milliseconds(200), std::bind(&RLEpisodeManager::checkEpisode, this));
 
+        resetting_ = false;
+
         RCLCPP_INFO(get_logger(), "RL Episode Manager started");
     }
 
@@ -53,8 +55,13 @@ private:
 
     void checkEpisode()
     {
+        if (resetting_)
+            return;
+
         if (std::abs(pitch_) > 1.2)
         {
+            resetting_ = true;
+
             RCLCPP_WARN(get_logger(), "Fall detected, resetting simulation");
 
             std::string cmd =
@@ -65,6 +72,10 @@ private:
                 "--req 'name: \"two_wheel_robot\" position { x: 0 y: 0 z: 0.3 }'";
 
             std::system(cmd.c_str());
+
+            rclcpp::sleep_for(std::chrono::milliseconds(3000));
+
+            resetting_ = false;
         }
     }
 
@@ -72,6 +83,8 @@ private:
     rclcpp::TimerBase::SharedPtr timer_;
 
     double pitch_ = 0.0;
+
+    bool resetting_;
 };
 
 int main(int argc, char **argv)
