@@ -29,96 +29,119 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 #include "rclcpp/rclcpp.hpp"
-#include "robot_rl/rl_pid_agent.hpp"
+#include "std_msgs/msg/float64.hpp"
+#include "std_msgs/msg/float64_multi_array.hpp"
 #include <algorithm>
 #include <random>
 
-RLPIDAgent::RLPIDAgent()
-: Node("robot_rl_pid_agent")
+class RLPIDAgent : public rclcpp::Node
 {
-    pitch_ = 0.0;
-    pitch_rate_ = 0.0;
-
-    kp_ = 0.0;
-    ki_ = 0.0;
-    kd_ = 0.0;
-
-    gains_initialized_ = false;
-
-    noise_scale_ = 0.2;
-
-    pitch_sub_ = create_subscription<std_msgs::msg::Float64>("/state/pitch", 10, std::bind(&RLPIDAgent::pitchCallback, this, std::placeholders::_1));
-
-    rate_sub_ = create_subscription<std_msgs::msg::Float64>("/state/pitch_rate", 10, std::bind(&RLPIDAgent::rateCallback, this, std::placeholders::_1));
-
-    gain_state_sub_ = create_subscription<std_msgs::msg::Float64MultiArray>("/current_pid_gains", 10, std::bind(&RLPIDAgent::gainStateCallback, this, std::placeholders::_1));
-
-    gain_pub_ = create_publisher<std_msgs::msg::Float64MultiArray>("/pid_gains", 10);
-
-    timer_ = create_wall_timer(std::chrono::milliseconds(100), std::bind(&RLPIDAgent::step, this));
-
-    RCLCPP_INFO(get_logger(), "robot_rl (C++) PID tuner started");
-}
-
-void RLPIDAgent::pitchCallback(const std_msgs::msg::Float64::SharedPtr msg)
-{
-    pitch_ = msg->data;
-}
-
-void RLPIDAgent::rateCallback(const std_msgs::msg::Float64::SharedPtr msg)
-{
-    pitch_rate_ = msg->data;
-}
-
-void RLPIDAgent::gainStateCallback(const std_msgs::msg::Float64MultiArray::SharedPtr msg)
-{
-    if (msg->data.size() < 3) return;
-
-    if (!gains_initialized_)
+public:
+    RLPIDAgent()
+    : Node("robot_rl_pid_agent")
     {
-        kp_ = msg->data[0];
-        ki_ = msg->data[1];
-        kd_ = msg->data[2];
+        pitch_ = 0.0;
+        pitch_rate_ = 0.0;
 
-        gains_initialized_ = true;
+        kp_ = 0.0;
+        ki_ = 0.0;
+        kd_ = 0.0;
 
-        RCLCPP_INFO(get_logger(), "Initial PID received: kp=%.3f ki=%.3f kd=%.3f", kp_, ki_, kd_);
+        gains_initialized_ = false;
+
+        noise_scale_ = 0.2;
+
+        pitch_sub_ = create_subscription<std_msgs::msg::Float64>("/state/pitch", 10, std::bind(&RLPIDAgent::pitchCallback, this, std::placeholders::_1));
+
+        rate_sub_ = create_subscription<std_msgs::msg::Float64>("/state/pitch_rate", 10, std::bind(&RLPIDAgent::rateCallback, this, std::placeholders::_1));
+
+        gain_state_sub_ = create_subscription<std_msgs::msg::Float64MultiArray>("/current_pid_gains", 10, std::bind(&RLPIDAgent::gainStateCallback, this, std::placeholders::_1));
+
+        gain_pub_ = create_publisher<std_msgs::msg::Float64MultiArray>("/pid_gains", 10);
+
+        timer_ = create_wall_timer(std::chrono::milliseconds(100), std::bind(&RLPIDAgent::step, this));
+
+        RCLCPP_INFO(get_logger(), "robot_rl (C++) PID tuner started");
     }
-}
 
-double RLPIDAgent::reward()
-{
-    return - (std::abs(pitch_) + 0.1 * std::abs(pitch_rate_));
-}
+private:
+    void pitchCallback(const std_msgs::msg::Float64::SharedPtr msg)
+    {
+        pitch_ = msg->data;
+    }
 
-void RLPIDAgent::step()
-{
-    if (!gains_initialized_)
-        return;
+    void rateCallback(const std_msgs::msg::Float64::SharedPtr msg)
+    {
+        pitch_rate_ = msg->data;
+    }
 
-    double r = reward();
+    void gainStateCallback(const std_msgs::msg::Float64MultiArray::SharedPtr msg)
+    {
+        if (msg->data.size() < 3) return;
 
-    static std::default_random_engine gen;
-    static std::normal_distribution<double> dist(0.0, 1.0);
+        if (!gains_initialized_)
+        {
+            kp_ = msg->data[0];
+            ki_ = msg->data[1];
+            kd_ = msg->data[2];
 
-    double noise = dist(gen);
+            gains_initialized_ = true;
 
-    double scaled_reward = std::tanh(r);
+            RCLCPP_INFO(get_logger(), "Initial PID received: kp=%.3f ki=%.3f kd=%.3f", kp_, ki_, kd_);
+        }
+    }
 
-    kp_ += noise_scale_ * noise * scaled_reward;
-    kd_ += noise_scale_ * noise * scaled_reward * 0.5;
+    double reward()
+    {
+        return - (std::abs(pitch_) + 0.1 * std::abs(pitch_rate_));
+    }
 
-    kp_ = std::clamp(kp_, 0.0, 2000.0);
-    kd_ = std::clamp(kd_, 0.0, 500.0);
-    ki_ = 0.0;
+    void step()
+    {
+        if (!gains_initialized_)
+            return;
 
-    std_msgs::msg::Float64MultiArray msg;
-    msg.data = {kp_, ki_, kd_};
+        double r = reward();
 
-    gain_pub_->publish(msg);
+        static std::default_random_engine gen;
+        static std::normal_distribution<double> dist(0.0, 1.0);
 
-    RCLCPP_INFO(get_logger(), "pitch=%.3f rate=%.3f reward=%.3f kp=%.2f ki=%.2f kd=%.2f", pitch_, pitch_rate_, r, kp_, ki_, kd_);
-}
+        double noise = dist(gen);
+
+        double scaled_reward = std::tanh(r);
+
+        kp_ += noise_scale_ * noise * scaled_reward;
+        kd_ += noise_scale_ * noise * scaled_reward * 0.5;
+
+        kp_ = std::clamp(kp_, 0.0, 2000.0);
+        kd_ = std::clamp(kd_, 0.0, 500.0);
+        ki_ = 0.0;
+
+        std_msgs::msg::Float64MultiArray msg;
+        msg.data = {kp_, ki_, kd_};
+
+        gain_pub_->publish(msg);
+
+        RCLCPP_INFO(get_logger(), "pitch=%.3f rate=%.3f reward=%.3f kp=%.2f ki=%.2f kd=%.2f", pitch_, pitch_rate_, r, kp_, ki_, kd_);
+    }
+
+    double pitch_;
+    double pitch_rate_;
+
+    double kp_;
+    double ki_;
+    double kd_;
+
+    rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr pitch_sub_;
+    rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr rate_sub_;
+    rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr gain_state_sub_;
+    rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr gain_pub_;
+    rclcpp::TimerBase::SharedPtr timer_;
+
+    double noise_scale_;
+
+    bool gains_initialized_;
+};
 
 int main(int argc, char **argv)
 {
