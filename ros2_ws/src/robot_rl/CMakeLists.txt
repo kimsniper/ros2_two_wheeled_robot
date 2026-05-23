@@ -13,14 +13,11 @@ find_package(std_msgs REQUIRED)
 include_directories(include)
 
 add_executable(rl_pid_agent src/rl_pid_agent.cpp)
-add_executable(rl_episode_manager src/rl_episode_manager.cpp)
 
 ament_target_dependencies(rl_pid_agent rclcpp std_msgs)
-ament_target_dependencies(rl_episode_manager rclcpp std_msgs)
 
 install(TARGETS
   rl_pid_agent
-  rl_episode_manager
   DESTINATION lib/${PROJECT_NAME}
 )
 
