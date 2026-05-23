@@ -82,7 +82,15 @@ private:
         }
     }
 
-    double reward(){ return -std::abs(pitch_) - 0.1*std::abs(pitch_rate_) - 0.5*std::abs(base_velocity_); }
+    double reward()
+    {
+        double r = -std::abs(pitch_) - 0.1*std::abs(pitch_rate_) - 0.8*std::abs(base_velocity_);
+
+        if (std::abs(pitch_) > 1.2)
+            r -= 500.0;
+
+        return r;
+    }
 
     void publishGains()
     {
@@ -108,6 +116,12 @@ private:
         {
             best_reward_ = r;
             best_kp_ = kp_; best_ki_ = ki_; best_kd_ = kd_;
+        }
+        else
+        {
+            kp_ = best_kp_;
+            ki_ = best_ki_;
+            kd_ = best_kd_;
         }
 
         const double fall_threshold = 1.2;
