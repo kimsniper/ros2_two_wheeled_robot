@@ -62,12 +62,20 @@ def generate_launch_description():
         output='screen'
     )
 
+    odometry = Node(
+        package='robot_odometry',
+        executable='odometry_node',
+        output='screen',
+        parameters=[use_sim_time]
+    )
+
     return LaunchDescription([
         sim,
 
         controller_manager,
         load_joint_state_broadcaster,
         load_wheel_controller,
+        odometry,
 
         estimator,
         balance_controller
