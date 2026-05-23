@@ -131,7 +131,7 @@ private:
 
         velocity_pub_->publish(vel_msg);
 
-        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000, "v=%.3f x=%.3f y=%.3f yaw=%.3f", linear_velocity, x_, y_, yaw_);
+        // RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000, "v=%.3f x=%.3f y=%.3f yaw=%.3f", linear_velocity, x_, y_, yaw_);
     }
 
     rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_sub_;
