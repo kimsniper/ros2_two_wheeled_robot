@@ -27,21 +27,74 @@
                 izz="0.1"/>
         </inertial>
 
+        <!-- Lower plate -->
         <visual>
-            <origin xyz="0 0 0.1"/>
+            <origin xyz="0 0 0.045"/>
             <geometry>
-                <box size="0.2 0.4 0.2"/>
+                <box size="0.22 0.30 0.005"/>
             </geometry>
 
-            <material name="blue">
-                <color rgba="0 0 1 1"/>
+            <material name="black">
+                <color rgba="0.1 0.1 0.1 1"/>
             </material>
         </visual>
 
-        <collision>
-            <origin xyz="0 0 0.1"/>
+        <!-- Upper plate -->
+        <visual>
+            <origin xyz="0 0 0.145"/>
             <geometry>
-                <box size="0.2 0.4 0.2"/>
+                <box size="0.22 0.30 0.005"/>
+            </geometry>
+
+            <material name="black"/>
+        </visual>
+
+        <!-- Front left standoff -->
+        <visual>
+            <origin xyz="0.09 0.12 0.095"/>
+            <geometry>
+                <cylinder radius="0.005" length="0.10"/>
+            </geometry>
+
+            <material name="gold">
+                <color rgba="0.85 0.70 0.20 1"/>
+            </material>
+        </visual>
+
+        <!-- Front right standoff -->
+        <visual>
+            <origin xyz="0.09 -0.12 0.095"/>
+            <geometry>
+                <cylinder radius="0.005" length="0.10"/>
+            </geometry>
+
+            <material name="gold"/>
+        </visual>
+
+        <!-- Rear left standoff -->
+        <visual>
+            <origin xyz="-0.09 0.12 0.095"/>
+            <geometry>
+                <cylinder radius="0.005" length="0.10"/>
+            </geometry>
+
+            <material name="gold"/>
+        </visual>
+
+        <!-- Rear right standoff -->
+        <visual>
+            <origin xyz="-0.09 -0.12 0.095"/>
+            <geometry>
+                <cylinder radius="0.005" length="0.10"/>
+            </geometry>
+
+            <material name="gold"/>
+        </visual>
+
+        <collision>
+            <origin xyz="0 0 0.095"/>
+            <geometry>
+                <box size="0.22 0.30 0.11"/>
             </geometry>
         </collision>
 
