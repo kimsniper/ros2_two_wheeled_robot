@@ -15,16 +15,16 @@
     <link name="base_link">
 
         <inertial>
-            <origin xyz="0 0 0.03"/>
-            <mass value="3.0"/>
+            <origin xyz="0 0 0.095"/>
+            <mass value="0.80"/>
 
             <inertia
-                ixx="0.05"
+                ixx="0.00681"
                 ixy="0.0"
                 ixz="0.0"
-                iyy="0.05"
+                iyy="0.00404"
                 iyz="0.0"
-                izz="0.1"/>
+                izz="0.00923"/>
         </inertial>
 
         <!-- Lower plate -->
